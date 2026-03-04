@@ -14,8 +14,9 @@
       {%- if section.settings.subtitle != blank -%}
         {%- assign lines = section.settings.subtitle | newline_to_br | split: '<br />' -%}
         {%- for line in lines -%}
-          {%- if line != blank -%}
-            <p>{{ line | strip_html }}</p>
+          {%- assign clean_line = line | strip_html | strip -%}
+          {%- if clean_line != blank -%}
+            <p>{{ clean_line }}</p>
           {%- endif -%}
         {%- endfor -%}
       {%- else -%}

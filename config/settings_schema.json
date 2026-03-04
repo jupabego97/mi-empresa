@@ -197,6 +197,29 @@
     ]
   },
   {
+    "name": "WhatsApp",
+    "settings": [
+      {
+        "type": "header",
+        "content": "Botón flotante de WhatsApp"
+      },
+      {
+        "type": "text",
+        "id": "whatsapp_number",
+        "label": "Número de WhatsApp (sin +)",
+        "placeholder": "573001234567",
+        "info": "Número completo con código de país, sin espacios ni símbolos"
+      },
+      {
+        "type": "text",
+        "id": "whatsapp_message",
+        "label": "Mensaje predeterminado",
+        "default": "Hola! Me interesa un producto de NANO",
+        "info": "Mensaje que se pre-llena al abrir el chat"
+      }
+    ]
+  },
+  {
     "name": "Redes sociales",
     "settings": [
       {

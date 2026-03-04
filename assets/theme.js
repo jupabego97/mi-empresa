@@ -98,10 +98,12 @@ const CartManager = {
   },
 
   formatMoney(cents) {
+    const currency = window.Shopify?.currency?.active || 'COP';
+    const decimals = ['COP','CLP','JPY','KRW'].includes(currency) ? 0 : 2;
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
+      currency: currency,
+      minimumFractionDigits: decimals
     }).format(cents / 100);
   },
 
@@ -256,18 +258,25 @@ const MobileMenu = {
     const openBtn = document.querySelector('.mobile-menu-btn');
     const closeBtn = document.querySelector('.mobile-menu__close');
     const menu = document.querySelector('.mobile-menu');
+    const backdrop = document.getElementById('mobile-backdrop');
 
     if (!menu) return;
 
-    if (openBtn) openBtn.addEventListener('click', () => {
+    const openMenu = () => {
       menu.classList.add('is-open');
+      if (backdrop) backdrop.classList.add('is-open');
       document.body.style.overflow = 'hidden';
-    });
+    };
 
-    if (closeBtn) closeBtn.addEventListener('click', () => {
+    const closeMenu = () => {
       menu.classList.remove('is-open');
+      if (backdrop) backdrop.classList.remove('is-open');
       document.body.style.overflow = '';
-    });
+    };
+
+    if (openBtn) openBtn.addEventListener('click', openMenu);
+    if (closeBtn) closeBtn.addEventListener('click', closeMenu);
+    if (backdrop) backdrop.addEventListener('click', closeMenu);
   }
 };
 
@@ -315,9 +324,17 @@ const FilterTabs = {
       tab.classList.add('active');
 
       const filter = tab.dataset.filter;
-      container.querySelectorAll('[data-filter-item]').forEach(item => {
-        const match = filter === 'all' || item.dataset.filterItem === filter;
-        item.style.display = match ? '' : 'none';
+      container.querySelectorAll('[data-tags]').forEach(item => {
+        const tags = item.dataset.tags || '';
+        const match = filter === 'all' || tags.split(' ').includes(filter);
+
+        if (match) {
+          item.classList.remove('is-hidden');
+          item.classList.add('is-visible');
+        } else {
+          item.classList.remove('is-visible');
+          item.classList.add('is-hidden');
+        }
       });
     });
   }
