@@ -1,547 +1,335 @@
 /**
- * NANO Tech Store - JavaScript 2026
- * Theme Toggle, Staggered Reveals, Low-Carbon optimizado
+ * NANO Tech Store — Brutalista Theme JS v3.0
+ * Cart Slide-over | Notifications | Mobile Menu | Quantity
  */
 
-(function() {
-  'use strict';
+'use strict';
 
-  // ============================================
-  // THEME TOGGLE - Dark/Light Mode
-  // ============================================
-  const ThemeManager = {
-    STORAGE_KEY: 'nano-theme',
-    
-    init() {
-      this.toggle = document.getElementById('theme-toggle');
-      this.setInitialTheme();
-      this.bindEvents();
-    },
-    
-    setInitialTheme() {
-      // Check localStorage first
-      const savedTheme = localStorage.getItem(this.STORAGE_KEY);
-      
-      if (savedTheme) {
-        document.documentElement.setAttribute('data-theme', savedTheme);
-      } else {
-        // Check system preference
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-      }
-    },
-    
-    bindEvents() {
-      if (this.toggle) {
-        this.toggle.addEventListener('click', () => this.toggleTheme());
-      }
-      
-      // Listen for system preference changes
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        if (!localStorage.getItem(this.STORAGE_KEY)) {
-          document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-        }
-      });
-    },
-    
-    toggleTheme() {
-      const currentTheme = document.documentElement.getAttribute('data-theme');
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      
-      document.documentElement.setAttribute('data-theme', newTheme);
-      localStorage.setItem(this.STORAGE_KEY, newTheme);
-      
-      // Announce to screen readers
-      this.announceThemeChange(newTheme);
-    },
-    
-    announceThemeChange(theme) {
-      const announcement = document.createElement('div');
-      announcement.setAttribute('role', 'status');
-      announcement.setAttribute('aria-live', 'polite');
-      announcement.className = 'visually-hidden';
-      announcement.textContent = `Tema cambiado a ${theme === 'dark' ? 'oscuro' : 'claro'}`;
-      document.body.appendChild(announcement);
-      
-      setTimeout(() => announcement.remove(), 1000);
-    }
-  };
+/* ── CART MANAGER (Slide-over "Terminal de Compra") ─────── */
+const CartManager = {
+  overlay: null,
+  panel: null,
+  countEls: [],
 
-  // ============================================
-  // REVEAL ANIMATIONS - Staggered on scroll
-  // ============================================
-  const RevealManager = {
-    init() {
-      if (!('IntersectionObserver' in window)) {
-        // Fallback: show all elements
-        document.querySelectorAll('.reveal, .reveal-stagger').forEach(el => {
-          el.classList.add('revealed');
-        });
-        return;
-      }
-      
-      this.setupObserver();
-    },
-    
-    setupObserver() {
-      const options = {
-        root: null,
-        rootMargin: '0px 0px -50px 0px',
-        threshold: 0.1
-      };
-      
-      this.observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('revealed');
-            this.observer.unobserve(entry.target);
-          }
-        });
-      }, options);
-      
-      // Observe all reveal elements
-      document.querySelectorAll('.reveal, .reveal-stagger').forEach(el => {
-        this.observer.observe(el);
-      });
-    }
-  };
+  init() {
+    this.createPanel();
+    this.bindToggleBtns();
+    this.refresh();
+  },
 
-  // ============================================
-  // CART MANAGER - AJAX Cart functionality
-  // ============================================
-  const CartManager = {
-    init() {
-      this.updateCartCount();
-      this.bindFormSubmissions();
-    },
-    
-    async updateCartCount() {
-      try {
-        const response = await fetch('/cart.js');
-        const cart = await response.json();
-        
-        document.querySelectorAll('.cart-count, [data-cart-count], .header__cart-count').forEach(counter => {
-          counter.textContent = cart.item_count;
-          counter.classList.toggle('hidden', cart.item_count === 0);
-        });
-        
-        return cart;
-      } catch (error) {
-        console.error('Error updating cart:', error);
-      }
-    },
-    
-    bindFormSubmissions() {
-      document.addEventListener('submit', async (e) => {
-        const form = e.target;
-        
-        // Solo manejar formularios de carrito que NO tengan data-product-form
-        // Los formularios con data-product-form tienen su propio handler en main-product.liquid
-        if (form.matches('[action="/cart/add"]') && !form.hasAttribute('data-product-form')) {
-          // Skip if checkout button was clicked
-          if (e.submitter && e.submitter.name === 'checkout') return;
-          
-          e.preventDefault();
-          await this.handleAddToCart(form);
-        }
-      });
-    },
-    
-    async handleAddToCart(form) {
-      const submitBtn = form.querySelector('[type="submit"]');
-      const originalContent = submitBtn ? submitBtn.innerHTML : '';
-      
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
-            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-          </svg>
-          <span>Agregando...</span>
-        `;
-      }
-      
-      try {
-        // Obtener datos del formulario
-        const variantId = form.querySelector('[name="id"]')?.value;
-        const quantity = parseInt(form.querySelector('[name="quantity"]')?.value) || 1;
-        
-        console.log('Quick add to cart:', { variantId, quantity });
-        
-        if (!variantId) {
-          throw new Error('No se pudo identificar el producto');
-        }
-
-        const response = await fetch('/cart/add.js', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            items: [{
-              id: parseInt(variantId),
-              quantity: quantity
-            }]
-          })
-        });
-        
-        const result = await response.json();
-        console.log('Cart add response:', result);
-        
-        if (response.ok) {
-          await this.updateCartCount();
-          
-          if (submitBtn) {
-            submitBtn.innerHTML = `
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-              <span>¡Agregado!</span>
-            `;
-            submitBtn.style.background = 'var(--color-success)';
-          }
-          
-          const itemTitle = result.items ? result.items[0].product_title : (result.product_title || result.title || 'Producto');
-          NotificationManager.show(`"${itemTitle}" agregado al carrito`, 'success');
-          
-          setTimeout(() => {
-            if (submitBtn) {
-              submitBtn.disabled = false;
-              submitBtn.innerHTML = originalContent;
-              submitBtn.style.background = '';
-            }
-          }, 2000);
-        } else {
-          console.error('Cart error response:', result);
-          throw new Error(result.description || result.message || 'Error al agregar');
-        }
-      } catch (error) {
-        console.error('Cart error:', error);
-        NotificationManager.show(error.message || 'Error al agregar el producto', 'error');
-        
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = originalContent;
-        }
-      }
-    }
-  };
-
-  // ============================================
-  // NOTIFICATION MANAGER - Toast notifications
-  // ============================================
-  const NotificationManager = {
-    show(message, type = 'info') {
-      // Remove existing notification
-      const existing = document.querySelector('.notification-toast');
-      if (existing) existing.remove();
-      
-      const notification = document.createElement('div');
-      notification.className = 'notification-toast';
-      notification.setAttribute('role', 'alert');
-      notification.setAttribute('aria-live', 'polite');
-      
-      const icons = {
-        success: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-        error: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-        info: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
-      };
-      
-      const colors = {
-        success: 'var(--color-success)',
-        error: 'var(--color-error)',
-        info: 'var(--color-accent)'
-      };
-      
-      notification.innerHTML = `
-        <div class="notification-toast__icon">${icons[type]}</div>
-        <div class="notification-toast__message">${message}</div>
-        <button class="notification-toast__close" aria-label="Cerrar">&times;</button>
-      `;
-      
-      notification.style.cssText = `
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%) translateY(100px);
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 16px 20px;
-        background: ${colors[type]};
-        color: white;
-        font-family: var(--font-body);
-        font-size: 14px;
-        font-weight: 500;
-        border-radius: var(--radius-xl);
-        box-shadow: var(--shadow-xl);
-        z-index: var(--z-toast);
-        transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        max-width: calc(100vw - 48px);
-      `;
-      
-      document.body.appendChild(notification);
-      
-      // Close button
-      notification.querySelector('.notification-toast__close').addEventListener('click', () => {
-        this.hide(notification);
-      });
-      
-      // Animate in
-      requestAnimationFrame(() => {
-        notification.style.transform = 'translateX(-50%) translateY(0)';
-      });
-      
-      // Auto close
-      setTimeout(() => this.hide(notification), 4000);
-    },
-    
-    hide(notification) {
-      if (!notification.parentNode) return;
-      notification.style.transform = 'translateX(-50%) translateY(100px)';
-      setTimeout(() => notification.remove(), 400);
-    }
-  };
-
-  // Make notification available globally
-  window.showNotification = NotificationManager.show.bind(NotificationManager);
-
-  // ============================================
-  // QUANTITY SELECTOR (solo para páginas de producto, NO para carrito)
-  // ============================================
-  const QuantityManager = {
-    init() {
-      // Solo manejar selectores de cantidad en páginas de producto
-      // El carrito tiene su propio sistema de manejo
-      document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.quantity-btn, [data-action="minus"], [data-action="plus"]');
-        if (!btn) return;
-        
-        // IMPORTANTE: NO manejar NADA relacionado con el carrito
-        if (btn.closest('.cart-item')) return;
-        if (btn.closest('.cart-section')) return;
-        if (btn.closest('[data-cart-items]')) return;
-        if (document.body.classList.contains('template-cart')) return;
-        
-        // NO manejar botones con data-action="decrease", "increase" o "remove"
-        const action = btn.dataset.action;
-        if (action === 'decrease' || action === 'increase' || action === 'remove') return;
-        
-        const container = btn.closest('.quantity-selector') || btn.parentElement;
-        const input = container.querySelector('.quantity-input, input[type="number"]');
-        if (!input) return;
-        
-        // Si el input está dentro del carrito, no hacer nada
-        if (input.closest('.cart-item') || input.closest('.cart-section')) return;
-        
-        let value = parseInt(input.value) || 1;
-        const btnAction = action || (btn.classList.contains('quantity-btn--minus') ? 'minus' : 'plus');
-        
-        if (btnAction === 'minus') {
-          value = Math.max(1, value - 1);
-        } else {
-          value = value + 1;
-        }
-        
-        input.value = value;
-        // NO disparar evento change para evitar conflictos
-      });
-    }
-  };
-
-  // ============================================
-  // SMOOTH SCROLL
-  // ============================================
-  const SmoothScroll = {
-    init() {
-      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', (e) => {
-          const href = anchor.getAttribute('href');
-          if (href === '#') return;
-          
-          const target = document.querySelector(href);
-          if (target) {
-            e.preventDefault();
-            target.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start'
-            });
-          }
-        });
-      });
-    }
-  };
-
-  // ============================================
-  // LAZY LOADING IMAGES
-  // ============================================
-  const LazyLoader = {
-    init() {
-      if (!('IntersectionObserver' in window)) return;
-      
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const img = entry.target;
-            if (img.dataset.src) {
-              img.src = img.dataset.src;
-              img.removeAttribute('data-src');
-            }
-            img.classList.add('loaded');
-            observer.unobserve(img);
-          }
-        });
-      }, {
-        rootMargin: '50px 0px'
-      });
-      
-      document.querySelectorAll('img[data-src], img[loading="lazy"]').forEach(img => {
-        observer.observe(img);
-      });
-    }
-  };
-
-  // ============================================
-  // ACCESSIBILITY ENHANCEMENTS
-  // ============================================
-  const A11y = {
-    init() {
-      // Skip to content
-      const skipLink = document.querySelector('.skip-to-content-link');
-      if (skipLink) {
-        skipLink.addEventListener('click', (e) => {
-          e.preventDefault();
-          const target = document.querySelector(skipLink.getAttribute('href'));
-          if (target) {
-            target.setAttribute('tabindex', '-1');
-            target.focus();
-          }
-        });
-      }
-      
-      // Keyboard navigation for dropdowns
-      document.querySelectorAll('.header__menu-item--dropdown').forEach(item => {
-        const link = item.querySelector('.header__menu-link');
-        const dropdown = item.querySelector('.header__dropdown');
-        
-        if (link && dropdown) {
-          link.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              dropdown.style.opacity = '1';
-              dropdown.style.visibility = 'visible';
-              dropdown.style.transform = 'translateY(0)';
-              dropdown.querySelector('a')?.focus();
-            }
-          });
-          
-          dropdown.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-              dropdown.style.opacity = '0';
-              dropdown.style.visibility = 'hidden';
-              dropdown.style.transform = 'translateY(10px)';
-              link.focus();
-            }
-          });
-        }
-      });
-    }
-  };
-
-  // ============================================
-  // BUTTON FEEDBACK
-  // ============================================
-  const ButtonFeedback = {
-    init() {
-      const buttons = document.querySelectorAll('.btn, .hero-button, .product-card__btn');
-      
-      buttons.forEach(btn => {
-        btn.addEventListener('mousedown', function() {
-          this.style.transform = 'scale(0.97)';
-        });
-        
-        ['mouseup', 'mouseleave'].forEach(event => {
-          btn.addEventListener(event, function() {
-            this.style.transform = '';
-          });
-        });
-      });
-    }
-  };
-
-  // ============================================
-  // INJECT GLOBAL STYLES
-  // ============================================
-  const injectStyles = () => {
-    const styles = `
-      @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-      
-      .spin {
-        animation: spin 1s linear infinite;
-      }
-      
-      .notification-toast__close {
-        background: none;
-        border: none;
-        color: white;
-        font-size: 24px;
-        cursor: pointer;
-        padding: 0;
-        line-height: 1;
-        opacity: 0.8;
-        transition: opacity 0.2s;
-      }
-      
-      .notification-toast__close:hover {
-        opacity: 1;
-      }
-      
-      .notification-toast__icon {
-        flex-shrink: 0;
-      }
-      
-      .notification-toast__message {
-        flex: 1;
-      }
+  createPanel() {
+    // Overlay wrapper
+    const overlay = document.createElement('div');
+    overlay.className = 'cart-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-label', 'Terminal de Compra');
+    overlay.innerHTML = `
+      <div class="cart-overlay__backdrop"></div>
+      <div class="cart-panel">
+        <div class="cart-panel__header">
+          <span class="cart-panel__title">Terminal de Compra</span>
+          <button class="cart-panel__close" aria-label="Cerrar carrito">&times;</button>
+        </div>
+        <div class="cart-panel__body" id="cart-panel-body">
+          <div class="cart-panel__empty">
+            <div class="cart-panel__empty-icon">&#9783;</div>
+            <p class="cart-panel__empty-text">&gt; CARRITO_VACÍO</p>
+            <p class="cart-panel__empty-hint">Añade productos para continuar.</p>
+          </div>
+        </div>
+        <div class="cart-panel__footer" id="cart-panel-footer" style="display:none">
+          <div class="cart-panel__subtotal">
+            <span class="cart-panel__subtotal-label">SUBTOTAL:</span>
+            <span class="cart-panel__subtotal-value" id="cart-panel-total">$0</span>
+          </div>
+          <a href="/checkout" class="cart-panel__checkout" id="cart-panel-checkout">
+            PROCESAR EN SHOPIFY
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+          <p class="cart-panel__secure">&#128274; PAGO SEGURO CIFRADO POR SHOPIFY</p>
+        </div>
+      </div>
     `;
-    
-    const styleSheet = document.createElement('style');
-    styleSheet.textContent = styles;
-    document.head.appendChild(styleSheet);
-  };
 
-  // ============================================
-  // INITIALIZE ALL MODULES
-  // ============================================
-  const init = () => {
-    injectStyles();
-    ThemeManager.init();
-    RevealManager.init();
-    CartManager.init();
-    QuantityManager.init();
-    SmoothScroll.init();
-    LazyLoader.init();
-    A11y.init();
-    ButtonFeedback.init();
-    
-    // Remove no-js class
-    document.documentElement.classList.remove('no-js');
-    document.documentElement.classList.add('js');
-    
-    // Console welcome
-    console.log('%c¡Bienvenido a NANO Tech Store!', 'color: #6366F1; font-size: 18px; font-weight: bold;');
-    console.log('%cDiseño 2026 - Bento Grids | Neuro-diseño | Low-Carbon', 'color: #6B7280; font-size: 12px;');
-  };
+    document.body.appendChild(overlay);
+    this.overlay = overlay;
+    this.panel = overlay.querySelector('.cart-panel');
 
-  // Run on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+    // Close on backdrop
+    overlay.querySelector('.cart-overlay__backdrop').addEventListener('click', () => this.close());
+    overlay.querySelector('.cart-panel__close').addEventListener('click', () => this.close());
+
+    // ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.overlay.classList.contains('is-open')) this.close();
+    });
+  },
+
+  bindToggleBtns() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.cart-toggle-btn, [data-cart-toggle]');
+      if (btn) { e.preventDefault(); this.open(); }
+    });
+  },
+
+  open() {
+    this.overlay.classList.add('is-open');
+    this.overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    this.refresh();
+  },
+
+  close() {
+    this.overlay.classList.remove('is-open');
+    this.overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  },
+
+  async refresh() {
+    try {
+      const res = await fetch('/cart.js');
+      const cart = await res.json();
+      this.renderItems(cart);
+      this.updateCount(cart.item_count);
+    } catch (e) {
+      console.warn('Cart fetch error:', e);
+    }
+  },
+
+  formatMoney(cents) {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0
+    }).format(cents / 100);
+  },
+
+  renderItems(cart) {
+    const body = document.getElementById('cart-panel-body');
+    const footer = document.getElementById('cart-panel-footer');
+    const totalEl = document.getElementById('cart-panel-total');
+
+    if (!body) return;
+
+    if (!cart.items || cart.items.length === 0) {
+      body.innerHTML = `
+        <div class="cart-panel__empty">
+          <div class="cart-panel__empty-icon">&#9783;</div>
+          <p class="cart-panel__empty-text">&gt; CARRITO_VACÍO</p>
+          <p class="cart-panel__empty-hint">Añade productos para continuar.</p>
+        </div>`;
+      if (footer) footer.style.display = 'none';
+      return;
+    }
+
+    body.innerHTML = cart.items.map((item, index) => `
+      <div class="cart-item" data-index="${item.key}">
+        <img
+          class="cart-item__image"
+          src="${item.image ? item.image.replace('http:', 'https:') : ''}"
+          alt="${item.title}"
+          loading="lazy"
+          onerror="this.style.display='none'"
+        >
+        <div class="cart-item__info">
+          <p class="cart-item__title">${item.product_title}</p>
+          ${item.variant_title ? `<p class="cart-item__variant">${item.variant_title}</p>` : ''}
+          <p class="cart-item__price">${this.formatMoney(item.final_line_price)}</p>
+          <div class="cart-item__qty">
+            <button class="cart-item__qty-btn" data-qty-change="-1" data-key="${item.key}" aria-label="Reducir cantidad">&#8722;</button>
+            <span class="cart-item__qty-val">${item.quantity}</span>
+            <button class="cart-item__qty-btn" data-qty-change="1" data-key="${item.key}" aria-label="Aumentar cantidad">&#43;</button>
+          </div>
+        </div>
+        <div class="cart-item__actions">
+          <button class="cart-item__remove" data-key="${item.key}" aria-label="Eliminar ${item.title}">&times;</button>
+        </div>
+      </div>
+    `).join('');
+
+    if (footer) {
+      footer.style.display = 'block';
+      if (totalEl) totalEl.textContent = this.formatMoney(cart.total_price);
+    }
+
+    // Bind qty & remove buttons
+    body.querySelectorAll('[data-qty-change]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.key;
+        const change = parseInt(btn.dataset.qtyChange);
+        const item = cart.items.find(i => i.key === key);
+        if (item) this.updateQty(key, item.quantity + change);
+      });
+    });
+
+    body.querySelectorAll('[data-key].cart-item__remove').forEach(btn => {
+      btn.addEventListener('click', () => this.updateQty(btn.dataset.key, 0));
+    });
+  },
+
+  async updateQty(key, qty) {
+    try {
+      const res = await fetch('/cart/change.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: key, quantity: Math.max(0, qty) })
+      });
+      await res.json();
+      this.refresh();
+    } catch (e) {
+      console.warn('Cart update error:', e);
+    }
+  },
+
+  updateCount(count) {
+    document.querySelectorAll('[data-cart-count]').forEach(el => {
+      el.textContent = count;
+    });
+    // Update bracket notation in button text
+    document.querySelectorAll('.cart-toggle-btn').forEach(btn => {
+      btn.innerHTML = btn.innerHTML.replace(/\[\d+\]/, `[${count}]`);
+    });
   }
-})();
+};
+
+/* ── ADD TO CART ────────────────────────────────────────── */
+const AddToCart = {
+  init() {
+    document.addEventListener('submit', async (e) => {
+      const form = e.target.closest('form[action="/cart/add"]');
+      if (!form) return;
+      e.preventDefault();
+
+      const btn = form.querySelector('[type="submit"]');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = 'AGREGANDO...'; }
+
+      try {
+        const formData = new FormData(form);
+        const res = await fetch('/cart/add.js', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+          body: formData
+        });
+
+        if (!res.ok) throw new Error('Error al agregar');
+        const item = await res.json();
+
+        NotificationManager.show(`✓ ${item.title} agregado al carrito`, 'success');
+        CartManager.refresh();
+        CartManager.open();
+      } catch (err) {
+        NotificationManager.show('Error al agregar el producto', 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+      }
+    });
+  }
+};
+
+/* ── NOTIFICATION MANAGER ─────────────────────────────── */
+const NotificationManager = {
+  container: null,
+
+  init() {
+    this.container = document.createElement('div');
+    this.container.className = 'notification-container';
+    document.body.appendChild(this.container);
+
+    // Make globally accessible
+    window.showNotification = (msg, type) => this.show(msg, type);
+  },
+
+  show(message, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `notification notification--${type}`;
+    el.textContent = message;
+    this.container.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+};
+
+/* ── MOBILE MENU ──────────────────────────────────────── */
+const MobileMenu = {
+  init() {
+    const openBtn = document.querySelector('.mobile-menu-btn');
+    const closeBtn = document.querySelector('.mobile-menu__close');
+    const menu = document.querySelector('.mobile-menu');
+
+    if (!menu) return;
+
+    if (openBtn) openBtn.addEventListener('click', () => {
+      menu.classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', () => {
+      menu.classList.remove('is-open');
+      document.body.style.overflow = '';
+    });
+  }
+};
+
+/* ── QUANTITY SELECTOR (product page) ─────────────────── */
+const QuantityManager = {
+  init() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.product-form__qty-btn');
+      if (!btn) return;
+      const input = btn.closest('.product-form__qty')?.querySelector('.product-form__qty-input');
+      if (!input) return;
+      const current = parseInt(input.value) || 1;
+      const isIncrease = btn.textContent.trim() === '+';
+      input.value = Math.max(1, current + (isIncrease ? 1 : -1));
+    });
+  }
+};
+
+/* ── GALLERY (product page) ────────────────────────────── */
+const Gallery = {
+  init() {
+    document.addEventListener('click', (e) => {
+      const thumb = e.target.closest('.product-gallery__thumb');
+      if (!thumb) return;
+      const src = thumb.dataset.src;
+      const main = document.querySelector('.product-gallery__main img');
+      if (main && src) main.src = src;
+      document.querySelectorAll('.product-gallery__thumb').forEach(t => t.classList.remove('active'));
+      thumb.classList.add('active');
+    });
+  }
+};
+
+/* ── FILTER TABS (collection/featured section) ─────────── */
+const FilterTabs = {
+  init() {
+    document.addEventListener('click', (e) => {
+      const tab = e.target.closest('.filter-tab');
+      if (!tab) return;
+
+      const container = tab.closest('[data-filter-container]');
+      if (!container) return;
+
+      container.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const filter = tab.dataset.filter;
+      container.querySelectorAll('[data-filter-item]').forEach(item => {
+        const match = filter === 'all' || item.dataset.filterItem === filter;
+        item.style.display = match ? '' : 'none';
+      });
+    });
+  }
+};
+
+/* ── INIT ──────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  NotificationManager.init();
+  CartManager.init();
+  AddToCart.init();
+  MobileMenu.init();
+  QuantityManager.init();
+  Gallery.init();
+  FilterTabs.init();
+});
