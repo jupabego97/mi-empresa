@@ -23,31 +23,31 @@ const CartManager = {
     overlay.className = 'cart-overlay';
     overlay.setAttribute('aria-hidden', 'true');
     overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-label', 'Terminal de Compra');
+    overlay.setAttribute('aria-label', 'Tu carrito');
     overlay.innerHTML = `
       <div class="cart-overlay__backdrop"></div>
       <div class="cart-panel">
         <div class="cart-panel__header">
-          <span class="cart-panel__title">Terminal de Compra</span>
+          <span class="cart-panel__title">Tu carrito</span>
           <button class="cart-panel__close" aria-label="Cerrar carrito">&times;</button>
         </div>
         <div class="cart-panel__body" id="cart-panel-body">
           <div class="cart-panel__empty">
-            <div class="cart-panel__empty-icon">&#9783;</div>
-            <p class="cart-panel__empty-text">&gt; CARRITO_VACÍO</p>
+            <div class="cart-panel__empty-icon">🛒</div>
+            <p class="cart-panel__empty-text">Tu carrito está vacío</p>
             <p class="cart-panel__empty-hint">Añade productos para continuar.</p>
           </div>
         </div>
         <div class="cart-panel__footer" id="cart-panel-footer" style="display:none">
           <div class="cart-panel__subtotal">
-            <span class="cart-panel__subtotal-label">SUBTOTAL:</span>
+            <span class="cart-panel__subtotal-label">Subtotal</span>
             <span class="cart-panel__subtotal-value" id="cart-panel-total">$0</span>
           </div>
           <a href="/checkout" class="cart-panel__checkout" id="cart-panel-checkout">
-            PROCESAR EN SHOPIFY
+            Ir al checkout
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </a>
-          <p class="cart-panel__secure">&#128274; PAGO SEGURO CIFRADO POR SHOPIFY</p>
+          <p class="cart-panel__secure">🔒 Pago seguro cifrado por Shopify</p>
         </div>
       </div>
     `;
@@ -117,8 +117,8 @@ const CartManager = {
     if (!cart.items || cart.items.length === 0) {
       body.innerHTML = `
         <div class="cart-panel__empty">
-          <div class="cart-panel__empty-icon">&#9783;</div>
-          <p class="cart-panel__empty-text">&gt; CARRITO_VACÍO</p>
+          <div class="cart-panel__empty-icon">🛒</div>
+          <p class="cart-panel__empty-text">Tu carrito está vacío</p>
           <p class="cart-panel__empty-hint">Añade productos para continuar.</p>
         </div>`;
       if (footer) footer.style.display = 'none';
@@ -188,10 +188,6 @@ const CartManager = {
     document.querySelectorAll('[data-cart-count]').forEach(el => {
       el.textContent = count;
     });
-    // Update bracket notation in button text
-    document.querySelectorAll('.cart-toggle-btn').forEach(btn => {
-      btn.innerHTML = btn.innerHTML.replace(/\[\d+\]/, `[${count}]`);
-    });
   }
 };
 
@@ -201,6 +197,8 @@ const AddToCart = {
     document.addEventListener('submit', async (e) => {
       const form = e.target.closest('form[action="/cart/add"]');
       if (!form) return;
+      const submitter = e.submitter;
+      if (submitter && submitter.name === 'checkout') return;
       e.preventDefault();
 
       const btn = form.querySelector('[type="submit"]');
@@ -265,18 +263,120 @@ const MobileMenu = {
     const openMenu = () => {
       menu.classList.add('is-open');
       if (backdrop) backdrop.classList.add('is-open');
+      menu.setAttribute('aria-hidden', 'false');
+      if (openBtn) openBtn.setAttribute('aria-expanded', 'true');
       document.body.style.overflow = 'hidden';
     };
 
     const closeMenu = () => {
       menu.classList.remove('is-open');
       if (backdrop) backdrop.classList.remove('is-open');
+      menu.setAttribute('aria-hidden', 'true');
+      if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
       document.body.style.overflow = '';
     };
 
     if (openBtn) openBtn.addEventListener('click', openMenu);
     if (closeBtn) closeBtn.addEventListener('click', closeMenu);
     if (backdrop) backdrop.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && menu.classList.contains('is-open')) closeMenu();
+    });
+
+    const accordionBtn = menu.querySelector('.mobile-menu__accordion-btn');
+    const accordionPanel = menu.querySelector('.mobile-menu__accordion-panel');
+    if (accordionBtn && accordionPanel) {
+      accordionBtn.addEventListener('click', () => {
+        const expanded = accordionBtn.getAttribute('aria-expanded') === 'true';
+        accordionBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        accordionPanel.hidden = expanded;
+        const sign = accordionBtn.querySelector('span');
+        if (sign) sign.textContent = expanded ? '+' : '-';
+      });
+    }
+  }
+};
+
+/* ── MEGA MENU ─────────────────────────────────────────── */
+const MegaMenu = {
+  init() {
+    const trigger = document.querySelector('.site-nav__trigger');
+    const item = document.querySelector('.site-nav__item--mega');
+    if (!trigger || !item) return;
+
+    const open = () => trigger.setAttribute('aria-expanded', 'true');
+    const close = () => trigger.setAttribute('aria-expanded', 'false');
+    item.addEventListener('mouseenter', open);
+    item.addEventListener('mouseleave', close);
+    trigger.addEventListener('focus', open);
+    item.addEventListener('focusout', (e) => {
+      if (!item.contains(e.relatedTarget)) close();
+    });
+  }
+};
+
+/* ── HERO SLIDER ───────────────────────────────────────── */
+const HeroSlider = {
+  init() {
+    const root = document.querySelector('[data-hero-slider]');
+    if (!root) return;
+    const slides = [...root.querySelectorAll('[data-hero-slide]')];
+    if (!slides.length) return;
+    const dots = [...root.querySelectorAll('[data-hero-dot]')];
+    const prev = root.querySelector('[data-hero-prev]');
+    const next = root.querySelector('[data-hero-next]');
+    let current = 0;
+    let timer = null;
+
+    const show = (index) => {
+      current = (index + slides.length) % slides.length;
+      slides.forEach((slide, i) => slide.classList.toggle('is-active', i === current));
+      dots.forEach((dot, i) => dot.classList.toggle('is-active', i === current));
+    };
+
+    const play = () => {
+      const autoplay = root.dataset.autoplay === 'true';
+      const speed = (parseInt(root.dataset.speed || '5', 10) || 5) * 1000;
+      if (!autoplay || slides.length < 2) return;
+      clearInterval(timer);
+      timer = setInterval(() => show(current + 1), speed);
+    };
+
+    prev?.addEventListener('click', () => { show(current - 1); play(); });
+    next?.addEventListener('click', () => { show(current + 1); play(); });
+    dots.forEach((dot) => {
+      dot.addEventListener('click', () => {
+        show(parseInt(dot.dataset.heroDot || '0', 10));
+        play();
+      });
+    });
+
+    show(0);
+    play();
+  }
+};
+
+/* ── TESTIMONIALS CAROUSEL ─────────────────────────────── */
+const Testimonials = {
+  init() {
+    const root = document.querySelector('[data-testimonials]');
+    if (!root) return;
+    const cards = [...root.querySelectorAll('[data-testimonial]')];
+    const dots = [...root.querySelectorAll('[data-testimonial-dot]')];
+    if (cards.length < 2) return;
+    let current = 0;
+
+    const show = (index) => {
+      current = (index + cards.length) % cards.length;
+      cards.forEach((card, i) => card.classList.toggle('is-active', i === current));
+      dots.forEach((dot, i) => dot.classList.toggle('is-active', i === current));
+    };
+
+    dots.forEach((dot) => {
+      dot.addEventListener('click', () => show(parseInt(dot.dataset.testimonialDot || '0', 10)));
+    });
+
+    setInterval(() => show(current + 1), 6000);
   }
 };
 
@@ -349,4 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
   QuantityManager.init();
   Gallery.init();
   FilterTabs.init();
+  MegaMenu.init();
+  HeroSlider.init();
+  Testimonials.init();
 });

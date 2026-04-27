@@ -1,4 +1,4 @@
-{% comment %}Featured Products — Brutalista NANO v3.0{% endcomment %}
+{% comment %}Featured Products — Clean NANO v4.0{% endcomment %}
 
 {%- liquid
   assign collection_handle = section.settings.collection
@@ -10,32 +10,31 @@
   assign filter_tags_raw = section.settings.filter_tags | default: default_tags
 -%}
 
-<!-- Filter Tabs -->
-{%- if section.settings.show_filters -%}
-<div class="filter-tabs">
-  <div class="filter-tabs__inner" id="filter-tabs">
-    <button class="filter-tab active" data-filter="all" type="button">TODO</button>
-    {%- for tag in filter_tags_raw | split: ',' -%}
-      {%- assign tag_clean = tag | strip -%}
-      {%- if tag_clean != blank -%}
-        <button class="filter-tab" data-filter="{{ tag_clean | handleize }}" type="button">{{ tag_clean | upcase }}</button>
-      {%- endif -%}
-    {%- endfor -%}
+<div data-filter-container>
+  {%- if section.settings.show_filters -%}
+  <div class="filter-tabs">
+    <div class="filter-tabs__inner" id="filter-tabs">
+      <button class="filter-tab active" data-filter="all" type="button">Todos</button>
+      {%- for tag in filter_tags_raw | split: ',' -%}
+        {%- assign tag_clean = tag | strip -%}
+        {%- if tag_clean != blank -%}
+          <button class="filter-tab" data-filter="{{ tag_clean | handleize }}" type="button">{{ tag_clean | capitalize }}</button>
+        {%- endif -%}
+      {%- endfor -%}
+    </div>
   </div>
-</div>
-{%- endif -%}
+  {%- endif -%}
 
 <section class="product-section" data-section-id="{{ section.id }}">
   <div class="product-section__header">
-    <p class="product-section__eyebrow">{{ section.settings.eyebrow | default: 'CATÁLOGO' }}</p>
-    <h2 class="product-section__title">{{ section.settings.title | default: 'PRODUCTOS DESTACADOS' }}</h2>
+    <p class="product-section__eyebrow">{{ section.settings.eyebrow | default: 'Catálogo' }}</p>
+    <h2 class="product-section__title">{{ section.settings.title | default: 'Productos destacados' }}</h2>
   </div>
 
   <div class="product-grid" id="product-grid-featured">
     {%- if col != blank and col.products.size > 0 -%}
       {%- for product in col.products limit: products_to_show -%}
         {%- liquid
-          assign obj_num = forloop.index
           assign has_image = false
           if product.featured_image
             assign has_image = true
@@ -47,10 +46,7 @@
           endfor
           assign all_tags_handles = all_tags_handles | strip
         -%}
-        <article
-          class="product-card"
-          data-tags="{{ all_tags_handles }}"
-        >
+        <article class="product-card product-card--premium" data-tags="{{ all_tags_handles }}">
           <a href="{{ product.url }}" class="product-card__image-wrap">
             {%- if has_image -%}
               <img
@@ -61,6 +57,16 @@
                 width="600"
                 height="600"
               >
+              {%- if product.images.size > 1 -%}
+                <img
+                  class="product-card__image product-card__image--secondary"
+                  src="{{ product.images[1] | img_url: '600x600', crop: 'center' }}"
+                  alt="{{ product.title | escape }}"
+                  loading="lazy"
+                  width="600"
+                  height="600"
+                >
+              {%- endif -%}
             {%- else -%}
               <div class="product-card__placeholder" aria-hidden="true">
                 <svg width="64" height="64" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
@@ -68,25 +74,20 @@
                 </svg>
               </div>
             {%- endif -%}
-            <span class="product-card__badge">SYS.OBJ.{{ obj_num }}</span>
             {%- if product.compare_at_price > product.price -%}
               {%- assign savings_pct = product.compare_at_price | minus: product.price | times: 100 | divided_by: product.compare_at_price -%}
               <span class="product-card__sale-badge">-{{ savings_pct }}%</span>
+            {%- endif -%}
+            {%- if product.tags contains 'nuevo' -%}
+              <span class="product-card__badge product-card__badge--new">Nuevo</span>
+            {%- elsif product.tags contains 'mas-vendido' -%}
+              <span class="product-card__badge product-card__badge--top">Top venta</span>
             {%- endif -%}
           </a>
 
           <div class="product-card__body">
             <a href="{{ product.url }}"><h3 class="product-card__title">{{ product.title }}</h3></a>
-
-            {%- if product.tags.size > 0 -%}
-              <ul class="product-card__specs" aria-label="Especificaciones">
-                {%- for tag in product.tags limit: 3 -%}
-                  <li class="product-card__spec">{{ tag }}</li>
-                {%- endfor -%}
-              </ul>
-            {%- else -%}
-              <div class="product-card__specs" style="min-height:40px"></div>
-            {%- endif -%}
+            <p class="product-card__rating">★★★★☆ <span>4.8</span></p>
 
             <p class="product-card__price">
               {{ product.price | money }}
@@ -100,13 +101,13 @@
                 <form action="/cart/add" method="post">
                   <input type="hidden" name="id" value="{{ product.variants.first.id }}">
                   <input type="hidden" name="quantity" value="1">
-                  <button type="submit" class="product-card__btn">+ AGREGAR</button>
+                  <button type="submit" class="product-card__btn">Agregar al carrito</button>
                 </form>
               {%- else -%}
-                <a href="{{ product.url }}" class="product-card__btn">VER OPCIONES</a>
+                <a href="{{ product.url }}" class="product-card__btn product-card__btn--secondary">Ver opciones</a>
               {%- endif -%}
             {%- else -%}
-              <button class="product-card__btn" disabled>AGOTADO</button>
+              <button class="product-card__btn" disabled>Agotado</button>
             {%- endif -%}
           </div>
         </article>
@@ -115,7 +116,6 @@
     {%- elsif section.settings.collection == blank -%}
       {%- for product in collections.all.products limit: products_to_show -%}
         {%- liquid
-          assign obj_num = forloop.index
           assign has_image = false
           if product.featured_image
             assign has_image = true
@@ -127,7 +127,7 @@
           endfor
           assign all_tags_handles = all_tags_handles | strip
         -%}
-        <article class="product-card" data-tags="{{ all_tags_handles }}">
+        <article class="product-card product-card--premium" data-tags="{{ all_tags_handles }}">
           <a href="{{ product.url }}" class="product-card__image-wrap">
             {%- if has_image -%}
               <img
@@ -138,6 +138,16 @@
                 width="600"
                 height="600"
               >
+              {%- if product.images.size > 1 -%}
+                <img
+                  class="product-card__image product-card__image--secondary"
+                  src="{{ product.images[1] | img_url: '600x600', crop: 'center' }}"
+                  alt="{{ product.title | escape }}"
+                  loading="lazy"
+                  width="600"
+                  height="600"
+                >
+              {%- endif -%}
             {%- else -%}
               <div class="product-card__placeholder" aria-hidden="true">
                 <svg width="64" height="64" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
@@ -145,23 +155,19 @@
                 </svg>
               </div>
             {%- endif -%}
-            <span class="product-card__badge">SYS.OBJ.{{ obj_num }}</span>
             {%- if product.compare_at_price > product.price -%}
               {%- assign savings_pct = product.compare_at_price | minus: product.price | times: 100 | divided_by: product.compare_at_price -%}
               <span class="product-card__sale-badge">-{{ savings_pct }}%</span>
             {%- endif -%}
+            {%- if product.tags contains 'nuevo' -%}
+              <span class="product-card__badge product-card__badge--new">Nuevo</span>
+            {%- elsif product.tags contains 'mas-vendido' -%}
+              <span class="product-card__badge product-card__badge--top">Top venta</span>
+            {%- endif -%}
           </a>
           <div class="product-card__body">
             <a href="{{ product.url }}"><h3 class="product-card__title">{{ product.title }}</h3></a>
-            {%- if product.tags.size > 0 -%}
-              <ul class="product-card__specs">
-                {%- for tag in product.tags limit: 3 -%}
-                  <li class="product-card__spec">{{ tag }}</li>
-                {%- endfor -%}
-              </ul>
-            {%- else -%}
-              <div class="product-card__specs" style="min-height:40px"></div>
-            {%- endif -%}
+            <p class="product-card__rating">★★★★☆ <span>4.8</span></p>
             <p class="product-card__price">
               {{ product.price | money }}
               {%- if product.compare_at_price > product.price -%}
@@ -173,26 +179,26 @@
                 <form action="/cart/add" method="post">
                   <input type="hidden" name="id" value="{{ product.variants.first.id }}">
                   <input type="hidden" name="quantity" value="1">
-                  <button type="submit" class="product-card__btn">+ AGREGAR</button>
+                  <button type="submit" class="product-card__btn">Agregar al carrito</button>
                 </form>
               {%- else -%}
-                <a href="{{ product.url }}" class="product-card__btn">VER OPCIONES</a>
+                <a href="{{ product.url }}" class="product-card__btn product-card__btn--secondary">Ver opciones</a>
               {%- endif -%}
             {%- else -%}
-              <button class="product-card__btn" disabled>AGOTADO</button>
+              <button class="product-card__btn" disabled>Agotado</button>
             {%- endif -%}
           </div>
         </article>
       {%- endfor -%}
     {%- else -%}
-      <p style="font-family:var(--font-mono); color:var(--color-gray); padding:32px 0; grid-column:1/-1;">&gt; No hay productos en esta colección.</p>
+      <p style="color:var(--color-gray); padding:32px 0; grid-column:1/-1;">No hay productos en esta colección.</p>
     {%- endif -%}
   </div>
 
   {%- if section.settings.show_view_all -%}
-    <div style="text-align:center; margin-top:40px; padding-top:32px; border-top:var(--border);">
+    <div class="view-all-wrap">
       <a href="{{ section.settings.view_all_url | default: '/collections/all' }}" class="hero__cta">
-        {{ section.settings.view_all_label | default: 'VER TODO EL INVENTARIO' }}
+        {{ section.settings.view_all_label | default: 'Ver todo el catálogo' }}
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 12h14M12 5l7 7-7 7"/>
         </svg>
@@ -200,6 +206,7 @@
     </div>
   {%- endif -%}
 </section>
+</div>
 
 {% schema %}
 {
@@ -209,13 +216,13 @@
       "type": "text",
       "id": "eyebrow",
       "label": "Texto sobre el título",
-      "default": "CATÁLOGO"
+      "default": "Catálogo"
     },
     {
       "type": "text",
       "id": "title",
       "label": "Título de la sección",
-      "default": "PRODUCTOS DESTACADOS"
+      "default": "Productos destacados"
     },
     {
       "type": "collection",
@@ -253,7 +260,7 @@
       "type": "text",
       "id": "view_all_label",
       "label": "Texto del botón Ver Todo",
-      "default": "VER TODO EL INVENTARIO"
+      "default": "Ver todo el catálogo"
     },
     {
       "type": "url",
